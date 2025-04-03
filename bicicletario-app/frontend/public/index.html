@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Aplicação web para cadastro e acesso ao bicicletário com reconhecimento facial">
+    <title>Bicicletário - Acesso Seguro</title>
+
+    <!-- Estilos Globais -->
+    <link rel="stylesheet" href="assets/styles.css">
+
+    <!-- Ícone do Site -->
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+
+    <!-- Fontes do Google -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Firebase SDK -->
+    <!-- Atualize a versão conforme necessário -->
+    <script defer src="/__/firebase/11.6.0/firebase-app-compat.js"></script>
+    <script defer src="/__/firebase/11.6.0/firebase-auth-compat.js"></script>
+    <script defer src="/__/firebase/11.6.0/firebase-database-compat.js"></script>
+    <script defer src="/__/firebase/11.6.0/firebase-firestore-compat.js"></script>
+    <script defer src="/__/firebase/11.6.0/firebase-functions-compat.js"></script>
+    <script defer src="/__/firebase/11.6.0/firebase-messaging-compat.js"></script>
+    <script defer src="/__/firebase/11.6.0/firebase-storage-compat.js"></script>
+    <script defer src="/__/firebase/11.6.0/firebase-analytics-compat.js"></script>
+    <script defer src="/__/firebase/11.6.0/firebase-remote-config-compat.js"></script>
+    <script defer src="/__/firebase/11.6.0/firebase-performance-compat.js"></script>
+    <script defer src="/__/firebase/init.js?useEmulator=true"></script>
+</head>
+<body>
+  
+    <!-- Cabeçalho -->
+    <header class="header">
+        <div class="container">
+            <h1>Bicicletário</h1>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="/">Início</a></li>
+                    <li><a href="/register">Cadastro</a></li>
+                    <li><a href="/login">Login</a></li>
+                    <li><a href="/history">Histórico</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="main-content">
+        <div class="container">
+            <h2>Bem-vindo ao Bicicletário!</h2>
+            <p>Use o menu acima para acessar as funcionalidades.</p>
+            <div id="firebase-message">
+                <h3>Status do Firebase</h3>
+                <p id="firebase-status">Carregando Firebase...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Rodapé -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2023 Bicicletário. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts Personalizados -->
+    <script src="/src/index.js" type="module"></script>
+
+    <!-- Script para Verificar o Firebase -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const statusEl = document.querySelector('#firebase-status');
+
+            try {
+                // Inicializa o Firebase
+                let app = firebase.app();
+                let features = [
+                    'auth',
+                    'database',
+                    'firestore',
+                    'functions',
+                    'messaging',
+                    'storage',
+                    'analytics',
+                    'remoteConfig',
+                    'performance',
+                ].filter(feature => typeof app[feature] === 'function');
+
+                statusEl.textContent = `Firebase SDK carregado com: ${features.join(', ')}`;
+            } catch (e) {
+                console.error(e);
+                statusEl.textContent = 'Erro ao carregar o Firebase SDK. Verifique o console.';
+            }
+        });
+    </script>
+</body>
+</html>

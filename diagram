@@ -1,0 +1,59 @@
+/BICICLETARIO
+├── README.md
+├── firebase.json
+├── apphosting.yaml
+├── bicicletario-app
+│   ├── backend
+│   │   ├── config
+│   │   │   └── db.js             # Conexão com o banco de dados
+│   │   ├── controllers
+│   │   │   ├── accessController.js
+│   │   │   ├── authController.js
+│   │   │   └── userController.js
+│   │   ├── models
+│   │   │   ├── AccessLog.js
+│   │   │   └── User.js
+│   │   ├── routes
+│   │   │   ├── accessLogs.js
+│   │   │   ├── auth.js
+│   │   │   └── users.js
+│   │   ├── utils
+│   │   └── server.js
+│   ├── database
+│   │   ├── migrations
+│   │   └── seeds
+│   ├── frontend
+│   │   ├── public              # pasta pública no firebase
+│   │   │   ├── assets
+│   │   │   ├── favicon.ico
+│   │   │   ├── index.html
+│   │   │   └── manifest.json
+│   │   └── src
+│   │       ├── assets
+│   │       │   └── images
+│   │       │       └── logo.png
+│   │       ├── components
+│   │       │   ├── Button.js
+│   │       │   ├── Footer.js
+│   │       │   ├── Header.js
+│   │       │   └── InputField.js
+│   │       ├── pages
+│   │       │   ├── DashboardPage.js
+│   │       │   ├── HistoryPage.js
+│   │       │   ├── LoginPage.js
+│   │       │   └── RegisterPage.js
+│   │       ├── config
+│   │       │   └── firebaseConfig.js  # Configurações do Firebase (evite expor dados sensíveis)
+│   │       ├── styles
+│   │       │   └── styles.css
+│   │       ├── App.js
+│   │       └── index.js
+│   └── tests
+│       ├── unit
+│       │   ├── authController.test.js
+│       │   └── userModel.test.js
+│       ├── integration
+│       │   └── integration.test.js
+│       ├── package.json
+│       └── README.md
+
