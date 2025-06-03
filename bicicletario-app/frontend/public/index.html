@@ -30,7 +30,6 @@
     <script defer src="/__/firebase/init.js?useEmulator=true"></script>
 </head>
 <body>
-  
     <!-- Cabeçalho -->
     <header class="header">
         <div class="container">
@@ -51,9 +50,13 @@
         <div class="container">
             <h2>Bem-vindo ao Bicicletário!</h2>
             <p>Use o menu acima para acessar as funcionalidades.</p>
-            <div id="firebase-message">
-                <h3>Status do Firebase</h3>
-                <p id="firebase-status">Carregando Firebase...</p>
+
+            <!-- Div para o leitor de QR Code -->
+            <div id="qr-reader" style="width: 100%; max-width: 500px; margin: 20px auto;">
+                <h3>Escaneie o QR Code</h3>
+                <button id="camera-toggle" style="margin-bottom: 10px;">Abrir Câmera</button>
+                <video id="camera-feed" autoplay playsinline style="width: 100%; border: 2px solid #ccc;"></video>    
+                <p id="scan-result">Resultado do QR Code: Aguardando...</p>
             </div>
         </div>
     </main>
@@ -61,7 +64,7 @@
     <!-- Rodapé -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2023 Bicicletário. Todos os direitos reservados.</p>
+            <p>&copy; <span id="current-year"></span> Bicicletário 2025. Direitos dos alunos.</p>
         </div>
     </footer>
 
@@ -70,30 +73,82 @@
 
     <!-- Script para Verificar o Firebase -->
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const statusEl = document.querySelector('#firebase-status');
+        document.addEventListener("DOMContentLoaded", function () {
+            const statusEl = document.querySelector("#firebase-status");
 
             try {
                 // Inicializa o Firebase
                 let app = firebase.app();
                 let features = [
-                    'auth',
-                    'database',
-                    'firestore',
-                    'functions',
-                    'messaging',
-                    'storage',
-                    'analytics',
-                    'remoteConfig',
-                    'performance',
-                ].filter(feature => typeof app[feature] === 'function');
+                    "auth",
+                    "database",
+                    "firestore",
+                    "functions",
+                    "messaging",
+                    "storage",
+                    "analytics",
+                    "remoteConfig",
+                    "performance",
+                ].filter((feature) => typeof app[feature] === "function");
 
-                statusEl.textContent = `Firebase SDK carregado com: ${features.join(', ')}`;
+                statusEl.textContent = `Firebase SDK carregado com: ${features.join(", ")}`;
             } catch (e) {
                 console.error(e);
-                statusEl.textContent = 'Erro ao carregar o Firebase SDK. Verifique o console.';
+                statusEl.textContent = "Erro ao carregar o Firebase SDK. Verifique o console.";
             }
         });
+
+        // Atualiza o ano automaticamente
+        document.getElementById("current-year").textContent = new Date().getFullYear();
     </script>
+
+    <!-- Script para Controlar a Câmera -->
+    <script>let isCameraActive = false; // Variável para rastrear o estado da câmera
+let streamInstance = null; // Referência para o fluxo da câmera
+
+document.addEventListener("DOMContentLoaded", async function () {
+    const videoElement = document.getElementById("camera-feed");
+    const cameraToggleBtn = document.getElementById("camera-toggle");
+
+    // Função para iniciar a câmera
+    async function startCamera() {
+        try {
+            // Solicita acesso à câmera
+            streamInstance = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            videoElement.srcObject = streamInstance;
+
+            // Exibe o vídeo ao vivo
+            videoElement.play();
+
+            isCameraActive = true;
+            cameraToggleBtn.textContent = "Fechar Leitor QR Code";
+        } catch (error) {
+            console.error("Erro ao acessar a câmera:", error);
+            alert("Não foi possível acessar a câmera. Certifique-se de que ela está disponível e habilitada.");
+        }
+    }
+
+    // Função para parar a câmera
+    function stopCamera() {
+        if (streamInstance) {
+            const tracks = streamInstance.getTracks();
+            tracks.forEach(track => track.stop());
+            videoElement.srcObject = null;
+            streamInstance = null;
+        }
+        isCameraActive = false;
+        cameraToggleBtn.textContent = "Abrir Leitor QR Code";
+    }
+
+    // Evento de clique no botão
+    cameraToggleBtn.addEventListener("click", () => {
+        if (isCameraActive) {
+            stopCamera();
+        } else {
+            startCamera();
+        }
+    });
+});
+</script>
 </body>
 </html>

@@ -7,72 +7,7 @@ Este é um sistema completo de gerenciamento de acesso a bicicletários, desenvo
 ## 📁 Estrutura de Pastas
 
 ```
-/Biclesale/
-├── bicicletario-app/                      # App principal
-│   ├── backend/                           # API REST com Express
-│   │   ├── config/                        # Configuração do banco de dados
-│   │   │   └── db.js
-│   │   ├── controllers/                   # Controladores da API
-│   │   │   ├── accessController.js
-│   │   │   ├── authController.js
-│   │   │   └── userController.js
-│   │   ├── models/                        # Modelos de dados (ex: User, AccessLog)
-│   │   │   ├── AccessLog.js
-│   │   │   └── User.js
-│   │   ├── routes/                        # Rotas da API
-│   │   │   ├── accessLogs.js
-│   │   │   ├── auth.js
-│   │   │   └── users.js
-│   │   ├── utils/                         # Funções auxiliares (ex: validações)
-│   │   └── server.js                      # Ponto de entrada da API
-│   
-│   ├── database/                          # Migrations e seeds (inicialização do banco)
-│   │   ├── migrations/
-│   │   └── seeds/
-│   
-│   ├── frontend/                          # Aplicativo React (interface do usuário)
-│   │   ├── public/                        # Arquivos estáticos (index.html etc.)
-│   │   │   ├── assets/
-│   │   │   ├── favicon.ico
-│   │   │   ├── index.html
-│   │   │   └── manifest.json
-│   │   └── src/                           # Código fonte React
-│   │       ├── assets/                    # Imagens, logos, etc.
-│   │       │   └── images/
-│   │       │       └── logo.png
-│   │       ├── components/                # Componentes reutilizáveis
-│   │       │   ├── Button.js
-│   │       │   ├── Footer.js
-│   │       │   ├── Header.js
-│   │       │   └── InputField.js
-│   │       ├── pages/                     # Páginas principais (Login, Dashboard, etc.)
-│   │       │   ├── DashboardPage.js
-│   │       │   ├── HistoryPage.js
-│   │       │   ├── LoginPage.js
-│   │       │   └── RegisterPage.js
-│   │       ├── config/                    # Configuração do Firebase
-│   │       │   └── firebaseConfig.js
-│   │       ├── styles/                    # Estilos CSS
-│   │       │   └── styles.css
-│   │       ├── App.js                     # App principal
-│   │       └── index.js                   # Entrada da aplicação
-│   
-│   └── tests/                             # Testes automatizados
-│       ├── integration/                   # Testes de integração
-│       │   └── integration.test.js      
-│       ├── unit/                          # Testes unitários
-│       │   ├── authController.test.js
-│       │   └── userModel.test.js
-│       ├── package.json
-│       └── README.md
-│
-├── functions/                             # Cloud Functions do Firebase (se aplicável)
-│   ├── node_modules/                      # Dependências de funções
-│   ├── package.json                       # Dependências do Firebase Functions
-│   ├── package-lock.json
-│   └── README.md
-│
-└── README.md                              # Este arquivo
+Para mais detalhes sobre a estrutura do projeto, consulte [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
 
 ```
 
@@ -99,7 +34,7 @@ Este é um sistema completo de gerenciamento de acesso a bicicletários, desenvo
 ### Passos
 1. Clone o repositório
    ```bash
-   git clone <url-do-repositorio>
+   git clone <https://github.com/JadsNery/biclesale>
    cd Biclesale/bicicletario-app
    ```
 
@@ -143,7 +78,7 @@ Este é um sistema completo de gerenciamento de acesso a bicicletários, desenvo
 ---
 
 ## 📄 Licença
-Este projeto está licenciado sob a Licença MIT. Veja o arquivo `LICENSE` para mais informações.
+
 
 ---
 
