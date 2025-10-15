@@ -1,0 +1,14 @@
+com/unisales/bicicletario/BicicletarioApplication.class
+com/unisales/bicicletario/model/Usuario.class
+com/unisales/bicicletario/model/Vaga.class
+com/unisales/bicicletario/repository/UsuarioRepository.class
+com/unisales/bicicletario/service/ReservaService.class
+com/unisales/bicicletario/service/UsuarioService.class
+com/unisales/bicicletario/model/StatusReserva.class
+com/unisales/bicicletario/repository/ReservaRepository.class
+com/unisales/bicicletario/model/StatusVaga.class
+com/unisales/bicicletario/model/TipoUsuario.class
+com/unisales/bicicletario/controller/UsuarioController.class
+com/unisales/bicicletario/model/Reserva.class
+com/unisales/bicicletario/controller/ReservaController.class
+com/unisales/bicicletario/repository/VagaRepository.class

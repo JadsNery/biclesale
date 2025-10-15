@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bicicletário UniSales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <style>
+        /* Estilos básicos para o QR Code Reader */
+        #camera-feed {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        /* O canvas é usado para processar o vídeo, deve ser invisível */
+        #camera-canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <header class="bg-white shadow-md">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-indigo-700">Bicicletário</h1>
+            <nav id="nav-links">
+                </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 flex-grow">
+        <div id="login-view" class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg"></div>
+        <div id="cadastro-view" class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg hidden"></div>
+        <div id="app-view" class="hidden"></div>
+    </main>
+    
+    <div id="notification" class="fixed bottom-4 right-4 p-4 text-white rounded-lg shadow-xl hidden transition-opacity duration-300 opacity-0" role="alert"></div>
+
+    <script>
+        // Variáveis de estado global (simulação de sessão)
+        let userId = null;
+        let userType = null;
+        let userName = null;
+        
+        // Variáveis globais para o leitor QR Code
+        let videoElement = null;
+        let canvasElement = null;
+        let canvasContext = null;
+        let stream = null;
+        let animationFrameId = null;
+        let isCameraActive = false;
+        let scannedQrData = null; // Armazena o dado lido pelo QR Code
+
+        // URL base da sua API Spring Boot
+        const API_BASE = '/api'; 
+
+        // ====================================================================
+        // FUNÇÕES DE UTILIDADE E INTERFACE
+        // ====================================================================
+
+        /**
+         * Exibe uma notificação pop-up.
+         * @param {string} message Mensagem a ser exibida.
+         * @param {boolean} isSuccess Se true, é verde (sucesso); se false, é vermelho (erro).
+         */
+        function showNotification(message, isSuccess) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.remove('hidden', 'opacity-0', 'bg-red-500', 'bg-green-500');
+            notification.classList.add(isSuccess ? 'bg-green-500' : 'bg-red-500', 'opacity-100');
+
+            setTimeout(() => {
+                notification.classList.remove('opacity-100');
+                notification.classList.add('opacity-0');
+                setTimeout(() => notification.classList.add('hidden'), 300);
+            }, 5000);
+        }
+
+        /**
+         * Controla a visibilidade das diferentes telas.
+         */
+        function renderPage() {
+            // Esconde todas as views por padrão
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('cadastro-view').classList.add('hidden');
+            document.getElementById('app-view').classList.add('hidden');
+            
+            // Renderiza os links de navegação
+            renderNavLinks();
+
+            // Determina qual tela mostrar
+            if (userId && userType) {
+                document.getElementById('app-view').classList.remove('hidden');
+                renderAppView();
+            } else if (window.location.hash === '#cadastro') {
+                document.getElementById('cadastro-view').classList.remove('hidden');
+                renderCadastroForm();
+            } else {
+                document.getElementById('login-view').classList.remove('hidden');
+                renderLoginForm();
+            }
+        }
+
+        /**
+         * Renderiza os links de navegação baseado no estado de login.
+         */
+        function renderNavLinks() {
+            const nav = document.getElementById('nav-links');
+            nav.innerHTML = ''; // Limpa links anteriores
+
+            if (userId) {
+                // Usuário logado
+                nav.innerHTML = `
+                    <span class="text-gray-600 mr-4">Olá, ${userName}! (${userType})</span>
+                    <a href="#" id="logout-btn" class="text-red-500 hover:text-red-700 font-medium">Sair</a>
+                `;
+                document.getElementById('logout-btn').onclick = logout;
+            } else {
+                // Usuário deslogado
+                nav.innerHTML = `
+                    <a href="#login" class="text-indigo-600 hover:text-indigo-800 font-medium mr-4" onclick="window.location.hash=''; renderPage();">Login</a>
+                    <a href="#cadastro" class="text-gray-600 hover:text-gray-800 font-medium" onclick="window.location.hash='cadastro'; renderPage();">Cadastro</a>
+                `;
+            }
+        }
+
+        /**
+         * Limpa a sessão do usuário.
+         */
+        function logout() {
+            userId = null;
+            userType = null;
+            userName = null;
+            window.location.hash = '';
+            showNotification("Sessão encerrada com sucesso.", true);
+            renderPage();
+        }
+
+
+        // ====================================================================
+        // VIEWS DE AUTENTICAÇÃO (Login e Cadastro)
+        // ====================================================================
+
+        /**
+         * Renderiza o formulário de login.
+         */
+        function renderLoginForm() {
+            const view = document.getElementById('login-view');
+            view.innerHTML = `
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Login</h2>
+                <form id="login-form">
+                    <div class="mb-4">
+                        <label for="login-email" class="block text-gray-700 text-sm font-bold mb-2">E-mail</label>
+                        <input type="email" id="login-email" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="mb-6">
+                        <label for="login-senha" class="block text-gray-700 text-sm font-bold mb-2">Senha</label>
+                        <input type="password" id="login-senha" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-150">
+                            Entrar
+                        </button>
+                        <a href="#cadastro" class="inline-block align-baseline font-bold text-sm text-indigo-600 hover:text-indigo-800" onclick="window.location.hash='cadastro'; renderPage();">
+                            Não tem conta? Cadastre-se
+                        </a>
+                    </div>
+                </form>
+            `;
+            document.getElementById('login-form').onsubmit = handleLogin;
+        }
+
+        /**
+         * Lida com o envio do formulário de login.
+         */
+        async function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const senha = document.getElementById('login-senha').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/usuarios/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error || "Erro desconhecido ao fazer login.");
+                }
+
+                const data = await response.json();
+                
+                // Armazena a sessão (simulado)
+                userId = data.id;
+                userType = data.tipoUsuario;
+                userName = data.nome;
+
+                showNotification(`Bem-vindo, ${userName}!`, true);
+                renderPage(); // Recarrega para a view principal
+            } catch (error) {
+                console.error("Erro de login:", error.message);
+                showNotification(error.message, false);
+            }
+        }
+        
+        /**
+         * Renderiza o formulário de cadastro.
+         */
+        function renderCadastroForm() {
+            const view = document.getElementById('cadastro-view');
+            view.innerHTML = `
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Cadastro de Aluno</h2>
+                <form id="cadastro-form">
+                    <div class="mb-4">
+                        <label for="cadastro-nome" class="block text-gray-700 text-sm font-bold mb-2">Nome Completo</label>
+                        <input type="text" id="cadastro-nome" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="mb-4">
+                        <label for="cadastro-email" class="block text-gray-700 text-sm font-bold mb-2">E-mail</label>
+                        <input type="email" id="cadastro-email" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="mb-6">
+                        <label for="cadastro-senha" class="block text-gray-700 text-sm font-bold mb-2">Senha</label>
+                        <input type="password" id="cadastro-senha" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-150">
+                            Cadastrar
+                        </button>
+                        <a href="#login" class="inline-block align-baseline font-bold text-sm text-indigo-600 hover:text-indigo-800" onclick="window.location.hash=''; renderPage();">
+                            Já tenho conta
+                        </a>
+                    </div>
+                </form>
+            `;
+            document.getElementById('cadastro-form').onsubmit = handleCadastro;
+        }
+
+        /**
+         * Lida com o envio do formulário de cadastro.
+         */
+        async function handleCadastro(event) {
+            event.preventDefault();
+            const nome = document.getElementById('cadastro-nome').value;
+            const email = document.getElementById('cadastro-email').value;
+            const senha = document.getElementById('cadastro-senha').value;
+            
+            const newUser = {
+                nome,
+                email,
+                senha,
+                // O tipoUsuario será definido como ALUNO no UsuarioService
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/usuarios/registrar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newUser)
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error || "Erro desconhecido ao cadastrar.");
+                }
+
+                showNotification("Cadastro realizado com sucesso! Faça login.", true);
+                window.location.hash = ''; // Volta para a tela de login
+                renderPage();
+            } catch (error) {
+                console.error("Erro de cadastro:", error.message);
+                showNotification(error.message, false);
+            }
+        }
+
+
+        // ====================================================================
+        // VIEWS PRINCIPAIS (Aluno e Vigilante)
+        // ====================================================================
+
+        /**
+         * Renderiza a área principal baseada no tipo de usuário.
+         */
+        function renderAppView() {
+            const view = document.getElementById('app-view');
+            view.innerHTML = `
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6">Área Restrita</h2>
+                <div id="content-area"></div>
+            `;
+            
+            if (userType === 'VIGILANTE') {
+                renderVigilanteDashboard();
+            } else if (userType === 'ALUNO' || userType === 'PROFESSOR' || userType === 'FUNCIONARIO') {
+                renderUserArea();
+            }
+        }
+
+        /**
+         * Renderiza a área de Reserva para Alunos/Professores/Funcionários.
+         */
+        async function renderUserArea() {
+            const content = document.getElementById('content-area');
+            content.innerHTML = `
+                <h3 class="text-xl font-semibold mb-4 text-indigo-700">Minha Reserva</h3>
+                <div id="reserva-status" class="bg-white p-6 rounded-lg shadow-md">
+                    <p>Carregando status da reserva...</p>
+                </div>
+            `;
+            
+            // Simulação: Buscando a reserva pendente (em um sistema real, haveria um endpoint /api/reservas/minha-reserva)
+            // Por enquanto, só tentamos criar ou exibir.
+            try {
+                // Tenta buscar o status das vagas para exibição
+                const statusResponse = await fetch(`${API_BASE}/reservas/vagas/status`);
+                const statusData = await statusResponse.json();
+                
+                document.getElementById('reserva-status').innerHTML = `
+                    <p class="text-lg font-medium mb-4">Vagas Livres: <span class="text-green-600 font-bold">${statusData.LIVRE}</span> / Total: ${statusData.TOTAL}</p>
+                    <p class="text-gray-500 mb-6">Status da sua vaga será exibido aqui.</p>
+                    <button id="btn-reservar" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-150 disabled:bg-gray-400">
+                        Fazer Reserva
+                    </button>
+                    <div id="qr-code-area" class="mt-8 hidden flex flex-col items-center">
+                        <p class="mb-2 text-green-700 font-semibold">Reserva Confirmada! Use este QR Code na catraca.</p>
+                        <canvas id="qrcode-canvas" class="p-4 bg-white border border-gray-300 rounded-lg shadow-inner"></canvas>
+                        <p id="qr-code-data-text" class="mt-2 text-sm text-gray-600"></p>
+                    </div>
+                `;
+                
+                document.getElementById('btn-reservar').onclick = handleFazerReserva;
+
+            } catch (error) {
+                showNotification("Não foi possível carregar o status do bicicletário.", false);
+            }
+        }
+        
+        /**
+         * Lida com a criação da reserva pelo usuário.
+         */
+        async function handleFazerReserva() {
+            const btn = document.getElementById('btn-reservar');
+            btn.disabled = true;
+            btn.textContent = 'Reservando...';
+
+            try {
+                const response = await fetch(`${API_BASE}/reservas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usuarioId: userId })
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error || "Erro ao tentar reservar.");
+                }
+
+                const data = await response.json();
+                showNotification("Vaga reservada com sucesso! Prossiga para o check-in.", true);
+                
+                // 1. Exibir a área do QR Code
+                const qrCodeArea = document.getElementById('qr-code-area');
+                qrCodeArea.classList.remove('hidden');
+
+                // 2. Gerar e exibir o QR Code
+                new QRious({
+                    element: document.getElementById('qrcode-canvas'),
+                    value: data.qrCodeData, // O código que o backend gerou
+                    size: 200,
+                    level: 'H'
+                });
+                
+                document.getElementById('qr-code-data-text').textContent = data.qrCodeData;
+                btn.textContent = 'Reserva Ativa';
+                btn.disabled = true;
+
+            } catch (error) {
+                console.error("Erro na reserva:", error.message);
+                showNotification(error.message, false);
+                btn.textContent = 'Fazer Reserva';
+                btn.disabled = false;
+            }
+        }
+
+
+        /**
+         * Renderiza o painel de Vigilante (Portaria).
+         */
+        async function renderVigilanteDashboard() {
+            const content = document.getElementById('content-area');
+            content.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div id="status-card" class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-semibold mb-4 text-indigo-700">Status do Bicicletário</h3>
+                        <div id="status-data">Carregando...</div>
+                        <button id="btn-atualizar-status" class="mt-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded w-full transition duration-150">
+                            Atualizar
+                        </button>
+                    </div>
+
+                    <div id="qr-reader-card" class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-semibold mb-4 text-green-700">Leitor de QR Code (Check-in)</h3>
+                        <div id="camera-container" class="relative bg-gray-200 p-2 rounded-lg">
+                            <video id="camera-feed" class="w-full" autoplay muted></video>
+                            <canvas id="camera-canvas" class="hidden"></canvas>
+                        </div>
+                        <button id="toggle-camera-btn" class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition duration-150 w-full">
+                            Ligar Câmera
+                        </button>
+                        
+                        <div id="scannedQrDataDisplay" class="mt-4 p-3 border-l-4 border-green-500 bg-green-50 rounded hidden">
+                            <p class="font-medium text-green-700">QR Code Lido:</p>
+                            <p id="qrDataText" class="text-sm text-green-800 break-all"></p>
+                        </div>
+                        
+                        <button id="confirmActionButton" class="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-150 w-full disabled:bg-gray-400" disabled>
+                            Confirmar Acesso
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Inicializa componentes do QR Code
+            videoElement = document.getElementById('camera-feed');
+            canvasElement = document.getElementById('camera-canvas');
+            canvasContext = canvasElement.getContext('2d');
+            document.getElementById('toggle-camera-btn').onclick = toggleCamera;
+            document.getElementById('confirmActionButton').onclick = handleCheckin;
+            document.getElementById('btn-atualizar-status').onclick = updateStatusCard;
+
+            updateStatusCard();
+        }
+
+        /**
+         * Atualiza o cartão de status do Vigilante.
+         */
+        async function updateStatusCard() {
+            const statusDiv = document.getElementById('status-data');
+            statusDiv.innerHTML = 'Carregando...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/reservas/vagas/status`);
+                if (!response.ok) throw new Error("Erro ao carregar status.");
+                
+                const data = await response.json();
+                statusDiv.innerHTML = `
+                    <p class="text-2xl font-bold text-green-600 mb-2">${data.LIVRE}</p>
+                    <p class="text-sm text-gray-500 mb-4">Vagas Livres</p>
+                    <p>
+                        <div class="space-y-1 text-sm">
+                        <p>Reservadas: <span class="font-semibold">${data.RESERVADA}</span></p>
+                        <p>Ocupadas: <span class="font-semibold">${data.OCUPADA}</span></p>
+                        <p>Em Manutenção: <span class="font-semibold">${data.MANUTENCAO}</span></p>
+                        <hr class="my-1 border-gray-200">
+                        <p>Total de Vagas: <span class="font-bold">${data.TOTAL}</span></p>                    
+                        </div>
+                    </p>
+                `;
+            } catch (error) {
+                statusDiv.innerHTML = '<p class="text-red-500">Falha ao carregar dados.</p>';
+                showNotification(error.message, false);
+            }
+        }
+
+        /**
+         * Lida com o check-in usando o QR Code lido.
+         */
+        async function handleCheckin() {
+            if (!scannedQrData) {
+                showNotification("Nenhum QR Code válido foi lido.", false);
+                return;
+            }
+            
+            const btn = document.getElementById('confirmActionButton');
+            btn.disabled = true;
+            btn.textContent = 'Processando...';
+            stopCamera();
+
+            try {
+                const response = await fetch(`${API_BASE}/reservas/checkin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ qrCodeData: scannedQrData })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || "Erro desconhecido no check-in.");
+                }
+
+                showNotification(`Acesso liberado! Usuário: ${data.usuario}. Vaga Ocupada: ${data.vaga}.`, true);
+                
+            } catch (error) {
+                console.error("Erro no check-in:", error.message);
+                showNotification(error.message, false);
+            } finally {
+                // Reseta a interface do leitor
+                scannedQrData = null;
+                document.getElementById('qrDataText').textContent = '';
+                document.getElementById('scannedQrDataDisplay').classList.add('hidden');
+                btn.textContent = 'Confirmar Acesso';
+                updateStatusCard(); // Atualiza o status após a mudança de vaga
+            }
+        }
+
+
+        // ====================================================================
+        // FUNÇÕES DO LEITOR QR CODE (Câmera)
+        // ====================================================================
+
+        /**
+         * Inicia o feed da câmera e o scanning do QR Code.
+         */
+        function startCamera() {
+            if (isCameraActive) return;
+
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then((s) => {
+                    stream = s;
+                    videoElement.srcObject = stream;
+                    videoElement.setAttribute("playsinline", true); // necessário para iOS
+                    videoElement.play();
+                    
+                    isCameraActive = true;
+                    document.getElementById('toggle-camera-btn').textContent = 'Desligar Câmera';
+                    
+                    // Aguarda a câmera carregar para iniciar o scanning
+                    videoElement.onloadedmetadata = () => {
+                        scanQrCode();
+                    };
+                })
+                .catch((err) => {
+                    console.error("Erro ao acessar a câmera:", err);
+                    showNotification("Não foi possível acessar a câmera. Verifique permissões.", false);
+                });
+        }
+
+        /**
+         * Para o feed da câmera e cancela o scanning.
+         */
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            isCameraActive = false;
+            document.getElementById('toggle-camera-btn').textContent = 'Ligar Câmera';
+            videoElement.srcObject = null;
+        }
+
+        /**
+         * Função principal de scanning (chamada recursivamente via requestAnimationFrame).
+         */
+        function scanQrCode() {
+            if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA && isCameraActive) {
+                // Define o tamanho do canvas para o tamanho do vídeo
+                if (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight) {
+                    canvasElement.width = videoElement.videoWidth;
+                    canvasElement.height = videoElement.videoHeight;
+                }
+
+                // Desenha o frame do vídeo no canvas
+                canvasContext.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+                const imageData = canvasContext.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                
+                // Tenta decodificar o QR Code
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+
+                if (code) {
+                    console.log("QR Code encontrado:", code.data);
+                    scannedQrData = code.data;
+                    document.getElementById('qrDataText').textContent = scannedQrData;
+                    document.getElementById('scannedQrDataDisplay').classList.remove('hidden');
+                    document.getElementById('confirmActionButton').disabled = false;
+                    // Não para a câmera aqui, deixa o usuário confirmar ou escanear outro
+                } else {
+                    // Limpa a leitura anterior se o código sumir
+                    scannedQrData = null;
+                    document.getElementById('qrDataText').textContent = 'Procurando...';
+                    document.getElementById('scannedQrDataDisplay').classList.remove('hidden');
+                    document.getElementById('confirmActionButton').disabled = true;
+                }
+            }
+            
+            // Continua a procurar na próxima animação frame
+            animationFrameId = requestAnimationFrame(scanQrCode); 
+        }
+
+        /**
+         * Alterna o estado da câmera.
+         */
+        function toggleCamera() {
+            if (isCameraActive) {
+                stopCamera();
+            } else {
+                startCamera();
+            }
+        }
+
+        // ====================================================================
+        // INICIALIZAÇÃO
+        // ====================================================================
+
+        // Inicializa a renderização da página ao carregar
+        window.onload = renderPage;
+
+        // Atualiza a visualização se a URL com hash mudar
+        window.onhashchange = renderPage;
+
+    </script>
+</body>
+</html>
